@@ -156,7 +156,8 @@ footer{border-top:1px solid var(--line);padding:16px 20px 40px;color:var(--dim2)
     <span><b>Domain</b> 5–30°N, 45–105°E</span>
     <span><b>Grid</b> 0.25° daily</span>
     <span><b>Levels</b> 15 · 0–1000 m</span>
-    <span><b>Encoder</b> <span id="statusPill" style="color:var(--cyan)">dual-path CNN</span></span>
+    <span><b>Model scenario</b> <span id="statusPill" style="color:var(--cyan)">dual-path CNN</span></span>
+    <span><b>API</b> <span id="apiStatus" style="color:var(--dim2)">checking</span></span>
   </div>
 </header>
 
@@ -183,7 +184,7 @@ footer{border-top:1px solid var(--line);padding:16px 20px 40px;color:var(--dim2)
       <h3>Map field</h3>
       <div class="seg" id="layerSeg">
         <button data-v="recon" aria-pressed="true">Reconstructed T</button>
-        <button data-v="truth" aria-pressed="false">GLORYS T</button>
+        <button data-v="truth" aria-pressed="false">Reference T</button>
         <button data-v="err" aria-pressed="false">Error</button>
         <button data-v="sst" aria-pressed="false">SST</button>
         <button data-v="sss" aria-pressed="false">SSS</button>
@@ -259,7 +260,7 @@ footer{border-top:1px solid var(--line);padding:16px 20px 40px;color:var(--dim2)
     </section>
 
     <section data-panel="validate" hidden>
-      <p class="note">Skill is scored against held-out profiles: fifteen levels, 900 random ocean cells for the day, plus simulated gridded-ARGO matchups carrying instrument noise. Everything recomputes when you change the day, the inputs or the architecture.</p>
+      <p class="note">Illustrative scores compare the reconstruction with a synthetic reference profile at 900 ocean cells. The ARGO-style scatter uses simulated matchups with added instrument noise; it is not an independent validation result. Everything recomputes when you change the day, inputs or model scenario.</p>
       <div class="grid2">
         <div>
           <h2 style="margin-top:6px">Error by depth</h2>
@@ -271,14 +272,14 @@ footer{border-top:1px solid var(--line);padding:16px 20px 40px;color:var(--dim2)
           </div>
         </div>
         <div>
-          <h2 style="margin-top:6px">ARGO matchup at <span id="scatDepth" class="mono">100 m</span></h2>
+          <h2 style="margin-top:6px">Simulated ARGO-style matchups at <span id="scatDepth" class="mono">100 m</span></h2>
           <div class="canvaswrap"><canvas id="scatter" width="620" height="450"></canvas></div>
           <div class="legend"><span>One dot per float profile. The diagonal is perfect agreement.</span></div>
         </div>
       </div>
 
       <h2>Where the error lives</h2>
-      <p class="note">Absolute error at the selected level. It clusters on sharp gradients — the Somali and Oman upwelling fronts, eddy rims, and the freshwater-capped northern Bay of Bengal — which matches what basin-scale reconstructions report elsewhere.</p>
+      <p class="note">Absolute difference from the synthetic reference at the selected level. This view is illustrative and does not represent measured model error.</p>
       <div class="canvaswrap">
         <canvas id="errmap" width="1200" height="480"></canvas>
         <div class="maplabel" id="errLabel">—</div>
@@ -301,7 +302,7 @@ footer{border-top:1px solid var(--line);padding:16px 20px 40px;color:var(--dim2)
         <div class="node"><h5>Harmonise</h5><p>Every product is conservatively remapped to a common 0.25° daily grid, then gap-filled and land-masked.</p></div>
         <div class="node"><h5>Encode</h5><p>A nine-channel surface stack over a 32×32 patch is compressed to a 32-d latent vector per cell.</p></div>
         <div class="node"><h5>Decode</h5><p>Latent vector plus position and day-of-year maps to temperature at fifteen standard depths.</p></div>
-        <div class="node"><h5>Score</h5><p>RMSE, bias and correlation per level against GLORYS, then independently against gridded ARGO.</p></div>
+        <div class="node"><h5>Validate</h5><p>Planned evaluation: depth-wise RMSE, bias and correlation against held-out GLORYS and independent INCOIS Gridded ARGO profiles.</p></div>
       </div>
 
       <h2>Input products</h2>
@@ -309,18 +310,18 @@ footer{border-top:1px solid var(--line);padding:16px 20px 40px;color:var(--dim2)
       <table>
         <thead><tr><th>Variable</th><th>Product</th><th>Native grid</th><th>Step applied</th></tr></thead>
         <tbody>
-          <tr><td>Sea surface temperature</td><td>OSTIA L4</td><td class="mono">0.05° daily</td><td>5× conservative coarsening</td></tr>
-          <tr><td>Sea surface salinity</td><td>SMAP / SMOS L4</td><td class="mono">0.125° daily</td><td>2× coarsening, 7-day smoothing</td></tr>
-          <tr><td>Sea level anomaly</td><td>DUACS L4</td><td class="mono">0.25° daily</td><td>native, mean sea surface removed</td></tr>
-          <tr><td>Surface currents U, V</td><td>OSCAR v2 L4</td><td class="mono">0.25° 5-daily</td><td>interpolated to daily</td></tr>
-          <tr><td>Surface winds U, V</td><td>CCMP v3.1, ASCAT-C</td><td class="mono">0.25° 6-hourly</td><td>daily mean, stress recomputed</td></tr>
-          <tr><td>Temperature profiles, target</td><td>GLORYS reanalysis</td><td class="mono">1/12° daily</td><td>coarsened, fifteen levels kept</td></tr>
-          <tr><td>Temperature profiles, validation</td><td>Gridded ARGO, INCOIS LAS</td><td class="mono">1° monthly</td><td>held out of training entirely</td></tr>
+          <tr><td>Sea surface temperature</td><td>OSTIA L4</td><td class="mono">0.05° daily</td><td>coarsen to 0.25° daily</td></tr>
+          <tr><td>Sea surface salinity</td><td>SMAP / SMOS</td><td class="mono">0.125° daily</td><td>regrid to 0.25° daily</td></tr>
+          <tr><td>Sea level anomaly</td><td>DUACS</td><td class="mono">0.25° daily</td><td>native grid</td></tr>
+          <tr><td>Surface currents U, V</td><td>OSCAR L4 OC Final v2.0</td><td class="mono">0.25° daily</td><td>regrid and quality control</td></tr>
+          <tr><td>Surface winds U, V</td><td>ASCAT L2 Coastal; CCMP Winds 10M L4 v3.1</td><td class="mono">0.25° daily products</td><td>derive daily wind features</td></tr>
+          <tr><td>Temperature profiles, target</td><td>GLORYS Global Ocean Analysis</td><td class="mono">1/12° daily</td><td>coarsen; retain 15 target levels</td></tr>
+          <tr><td>Temperature profiles, validation</td><td>INCOIS Live Access Server, Gridded ARGO</td><td class="mono">in-situ profiles</td><td>independent evaluation only</td></tr>
         </tbody>
       </table>
       </div>
 
-      <h2>Training setup</h2>
+      <h2>Proposed training setup · not yet run</h2>
       <dl class="kv" style="max-width:520px;font-size:12.5px">
         <dt>Training window</dt><dd class="mono">2010-01-01 to 2019-12-31</dd>
         <dt>Validation window</dt><dd class="mono">2020-01-01 to 2021-12-31</dd>
@@ -330,18 +331,10 @@ footer{border-top:1px solid var(--line);padding:16px 20px 40px;color:var(--dim2)
         <dt>Latent dimension</dt><dd class="mono">32</dd>
         <dt>Optimiser</dt><dd class="mono">AdamW, cosine decay, 60 epochs</dd>
       </dl>
-      <p class="note" style="margin-top:12px">The gradient penalty matters more than it sounds. A plain per-level loss gives profiles that are individually close but vertically ragged, so the diagnosed thermocline depth wanders from level to level. Penalising the vertical derivative keeps the reconstructed thermocline coherent, and the thermocline is what downstream heat-content, marine-heatwave and fisheries products actually read off the profile.</p>
+      <p class="note" style="margin-top:12px">These are proposed settings, not completed training results. The vertical-gradient penalty is intended to discourage ragged temperature profiles and improve thermocline coherence.</p>
 
       <h2>What this build is</h2>
-      <p class="note">A working front end over a physically parameterised ocean. Mixed-layer depth responds to wind stress and salinity stratification, thermocline depth responds to sea level anomaly and eddies, and the northern Bay of Bengal grows a barrier layer with a temperature inversion in winter. It exists so the interface, the diagnostics and the validation harness can be built and reviewed before the real archive lands. Replace <span class="mono">surfaceState()</span> with a NetCDF reader and <span class="mono">reconParams()</span> with a call to your trained checkpoint; nothing else on the page has to change.</p>
-
-      <h2>Reference points from the literature</h2>
-      <ul class="note" style="padding-left:18px">
-        <li>A North Atlantic reconstruction from SST, SSH/SLA, winds and SST gradient reports roughly 0.49 °C RMSE overall, with error concentrated in the thermocline and along the Gulf Stream, and SST the dominant predictor at every depth. <span style="color:var(--dim2)">Taylor &amp; Francis, 2026</span></li>
-        <li>TS-Cast, over the northwestern Pacific, keeps temperature RMSE under about 1 °C in the upper 500 m, peaking at the main thermocline. <span style="color:var(--dim2)">Ocean Science, 2026</span></li>
-        <li>A global ConvLSTM product finds skill falling fastest between 100 and 500 m, where mixed-layer and thermocline processes are least visible from the surface. <span style="color:var(--dim2)">Remote Sensing, 2022</span></li>
-        <li>A dual-path CNN places vertical errors mostly in the upper ocean, in the 0.2 to 1.0 °C range. <span style="color:var(--dim2)">JMSE, 2023</span></li>
-      </ul>
+      <p class="note">This frontend is an interactive proof of concept driven by a deterministic synthetic ocean. It has no live satellite data, GLORYS or ARGO connection and no trained checkpoint. A production MVP still needs a NetCDF preprocessing service, a trained reconstruction model and independent validation against withheld INCOIS ARGO profiles.</p>
     </section>
   </main>
 
@@ -354,7 +347,7 @@ footer{border-top:1px solid var(--line);padding:16px 20px 40px;color:var(--dim2)
       <h4>Temperature profile</h4>
       <canvas id="profile" width="640" height="580" style="border-radius:3px"></canvas>
       <div class="legend">
-        <span><i style="background:var(--amber)"></i>GLORYS</span>
+        <span><i style="background:var(--amber)"></i>Synthetic reference</span>
         <span><i style="background:var(--cyan)"></i>Reconstructed</span>
         <span><i style="background:rgba(72,214,192,.3)"></i>±1σ</span>
       </div>
@@ -380,6 +373,7 @@ footer{border-top:1px solid var(--line);padding:16px 20px 40px;color:var(--dim2)
     <h4 style="margin:0 0 9px;font-size:13px;color:var(--dim)">Profile export, CSV</h4>
     <textarea id="csv" readonly spellcheck="false"></textarea>
     <div class="row">
+      <button class="btn" id="downloadBtn">Download CSV</button>
       <button class="btn" id="copyBtn">Copy</button>
       <button class="btn" id="closeBtn">Close</button>
     </div>
@@ -712,9 +706,9 @@ function arrows(ctx,W,H,fu,fv,scale){
 const LAYERS={
   recon:{t:d=>'Reconstructed temperature at '+d+' m',unit:'°C',cmap:cT,dom:[4,32],
     f:k=>tempAt(rAt(k),DEPTH)},
-  truth:{t:d=>'GLORYS temperature at '+d+' m',unit:'°C',cmap:cT,dom:[4,32],
+  truth:{t:d=>'Synthetic reference temperature at '+d+' m',unit:'°C',cmap:cT,dom:[4,32],
     f:k=>tempAt(tAt(k),DEPTH)},
-  err:{t:d=>'Reconstruction minus GLORYS at '+d+' m',unit:'°C',cmap:v=>cDiv(v/2.5),dom:[-2.5,2.5],
+  err:{t:d=>'Reconstruction minus synthetic reference at '+d+' m',unit:'°C',cmap:v=>cDiv(v/2.5),dom:[-2.5,2.5],
     f:k=>tempAt(rAt(k),DEPTH)-tempAt(tAt(k),DEPTH)},
   sst:{t:()=>'Sea surface temperature, OSTIA',unit:'°C',cmap:cT,dom:[22,32],f:k=>F.sst[k]},
   sss:{t:()=>'Sea surface salinity, SMAP/SMOS',unit:'psu',cmap:cSal,dom:[31,37],f:k=>F.sss[k]},
@@ -1019,7 +1013,7 @@ function drawErrMap(){
   const W=emC.width,H=emC.height;
   paintGrid(k=>Math.abs(tempAt(rAt(k),DEPTH)-tempAt(tAt(k),DEPTH)),cErr);
   blit(emX,W,H);coastline(emX,W,H);graticule(emX,W,H,emC);
-  document.getElementById('errLabel').textContent='Absolute error at '+DEPTH+' m · dark 0 °C to red 3 °C';
+  document.getElementById('errLabel').textContent='Synthetic-reference difference at '+DEPTH+' m · dark 0 °C to red 3 °C';
 }
 
 /* ===== right rail ===== */
@@ -1128,6 +1122,20 @@ function updateModelNote(){
   document.getElementById('modelNote').textContent=M.note+' '+M.params+' parameters, '+M.lat+' per daily field.';
   document.getElementById('statusPill').textContent=M.name;
 }
+async function updateApiStatus(){
+  const status=document.getElementById('apiStatus');
+  try{
+    const response=await fetch('/api/status');
+    if(!response.ok) throw new Error('API unavailable');
+    const result=await response.json();
+    status.textContent=result.dataMode==='synthetic'?'connected · synthetic':'connected';
+    status.style.color='var(--cyan)';
+  }catch{
+    status.textContent='offline · local demo';
+    status.style.color='var(--amber)';
+  }
+}
+updateApiStatus();
 document.querySelector('.tabs').addEventListener('click',ev=>{
   const b=ev.target.closest('button');if(!b)return;
   document.querySelectorAll('.tabs button').forEach(t=>t.setAttribute('aria-selected',String(t===b)));
@@ -1181,7 +1189,8 @@ document.getElementById('exportBtn').addEventListener('click',()=>{
     '# encoder,'+MODELS[MODEL].name+'\n'+
     '# inputs,'+Object.keys(ACTIVE).filter(x=>ACTIVE[x]).join(' ')+'\n'+
     '# sst,'+s.sst.toFixed(3)+'\n# sss,'+s.sss.toFixed(3)+'\n# sla_m,'+s.sla.toFixed(4)+'\n'+
-    'depth_m,t_reconstructed_c,t_glorys_c,error_c\n';
+    '# reference,synthetic placeholder (not GLORYS observations)\n'+
+    'depth_m,t_reconstructed_c,t_reference_synthetic_c,error_c\n';
   DEPTHS.forEach(z=>{
     const a=tempAt(rp,z),b=tempAt(tp,z);
     t+=z+','+a.toFixed(3)+','+b.toFixed(3)+','+(a-b).toFixed(3)+'\n';
@@ -1191,6 +1200,38 @@ document.getElementById('exportBtn').addEventListener('click',()=>{
 });
 document.getElementById('closeBtn').addEventListener('click',()=>
   document.getElementById('modal').dataset.open='false');
+document.getElementById('downloadBtn').addEventListener('click',async function(){
+  const button=this,originalText=button.textContent;
+  const k=PIN.j*NX+PIN.i,lon=LON0+(PIN.i+.5)*DX,lat=LAT0+(PIN.j+.5)*DX;
+  const tp=tAt(k),rp=rAt(k);
+  const payload={
+    metadata:{lon,lat,dayOfYear:DOY,modelScenario:MODELS[MODEL].name,inputs:Object.keys(ACTIVE).filter(key=>ACTIVE[key])},
+    profile:DEPTHS.map(depth=>{
+      const reconstructed=tempAt(rp,depth),reference=tempAt(tp,depth);
+      return {depth_m:depth,t_reconstructed_c:reconstructed,t_reference_synthetic_c:reference,error_c:reconstructed-reference};
+    })
+  };
+  const save=blob=>{
+    const url=URL.createObjectURL(blob),link=document.createElement('a');
+    link.href=url;link.download='oceanembed-profile-'+DOY+'-'+PIN.i+'-'+PIN.j+'.csv';
+    link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  };
+  button.disabled=true;button.textContent='Preparing...';
+  try{
+    const response=await fetch('/api/profile/export',{
+      method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)
+    });
+    if(!response.ok) throw new Error('Profile export API unavailable');
+    save(await response.blob());button.textContent='Downloaded';
+  }catch{
+    save(new Blob([document.getElementById('csv').value],{type:'text/csv;charset=utf-8'}));
+    button.textContent='Saved locally';
+    const status=document.getElementById('apiStatus');
+    status.textContent='offline · local export';status.style.color='var(--amber)';
+  }finally{
+    setTimeout(()=>{button.textContent=originalText;button.disabled=false;},1600);
+  }
+});
 document.getElementById('modal').addEventListener('click',ev=>{
   if(ev.target.id==='modal') ev.currentTarget.dataset.open='false';});
 document.getElementById('copyBtn').addEventListener('click',function(){
