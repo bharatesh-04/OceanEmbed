@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>OceanEmbed — subsurface temperature from surface satellites</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme: dark;
+  --abyss:#04131E; --deep:#07202F; --panel:#0B2A3B; --panel2:#0E3346;
+  --line:rgba(126,186,204,.16); --line2:rgba(126,186,204,.30);
+  --ink:#DEEDF1; --dim:#87A7B4; --dim2:#5E8091;
+  --cyan:#48D6C0; --amber:#F0A83C; --rose:#E8615A;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--abyss);color:var(--ink);
+  font-family:'Archivo',system-ui,-apple-system,'Segoe UI',sans-serif;
+  font-size:14px;line-height:1.5;
+  background-image:radial-gradient(1100px 560px at 18% -12%, #0A2E42 0%, rgba(4,19,30,0) 62%);
+}
+.mono{font-family:'IBM Plex Mono',ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+a{color:var(--cyan)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;border-radius:3px}
+
+header{
+  display:flex;flex-wrap:wrap;gap:12px 22px;align-items:baseline;
+  padding:14px 20px 12px;border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,rgba(11,42,59,.8),rgba(4,19,30,0));
+}
+.brand{font-size:21px;font-weight:700;letter-spacing:-.025em;margin:0}
+.brand i{font-style:normal;color:var(--cyan)}
+.tagline{color:var(--dim);font-size:13px;max-width:56ch;margin:2px 0 0}
+.masthead-spacer{flex:1 1 30px}
+.domain{font-size:12px;color:var(--dim2);display:flex;gap:16px;flex-wrap:wrap}
+.domain b{color:var(--dim);font-weight:500}
+
+.shell{display:grid;grid-template-columns:274px minmax(0,1fr) 352px;gap:1px;background:var(--line)}
+.rail,.stage{background:var(--abyss);min-width:0}
+.rail{padding:16px 16px 40px}
+.stage{padding:14px 18px 40px}
+@media(max-width:1180px){ .shell{grid-template-columns:250px minmax(0,1fr)} .rail.right{grid-column:1/-1} }
+@media(max-width:820px){ .shell{grid-template-columns:minmax(0,1fr)} .rail{grid-column:auto} }
+
+.group{margin-bottom:22px}
+.group>h3{font-size:12px;font-weight:600;color:var(--dim);margin:0 0 9px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.group>h3 span{color:var(--cyan);font-size:11px;font-weight:500}
+.hint{font-size:11.5px;color:var(--dim2);margin:7px 0 0;line-height:1.45}
+
+.seg{display:flex;flex-wrap:wrap;gap:4px}
+.seg button{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:5px 9px;font-size:12px;cursor:pointer;color:var(--dim);transition:background .12s,color .12s,border-color .12s}
+.seg button:hover{background:var(--panel2);color:var(--ink)}
+.seg button[aria-pressed="true"]{background:#14485E;border-color:var(--cyan);color:#EAFBF7}
+
+.depthgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.depthgrid button{background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:6px 0;font-family:'IBM Plex Mono',monospace;font-size:11.5px;cursor:pointer;color:var(--dim)}
+.depthgrid button:hover{background:var(--panel2);color:var(--ink)}
+.depthgrid button[aria-pressed="true"]{background:#14485E;border-color:var(--cyan);color:#EAFBF7}
+
+.toggle{display:flex;align-items:center;gap:9px;padding:6px 8px;border:1px solid transparent;border-radius:4px;cursor:pointer;user-select:none;width:100%;background:none;text-align:left}
+.toggle:hover{background:rgba(20,72,94,.5)}
+.toggle .sw{width:30px;height:17px;border-radius:9px;background:#123444;border:1px solid var(--line2);position:relative;flex:0 0 auto;transition:background .15s}
+.toggle .sw::after{content:"";position:absolute;top:1.5px;left:1.5px;width:12px;height:12px;border-radius:50%;background:var(--dim2);transition:transform .15s,background .15s}
+.toggle[aria-pressed="true"] .sw{background:#14485E;border-color:var(--cyan)}
+.toggle[aria-pressed="true"] .sw::after{transform:translateX(13px);background:var(--cyan)}
+.toggle .lab{font-size:12.5px;flex:1;min-width:0}
+.toggle .lab em{display:block;font-style:normal;font-size:11px;color:var(--dim2)}
+.toggle[aria-pressed="false"] .lab{color:var(--dim2)}
+
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:20px;background:transparent;cursor:pointer;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:3px;background:var(--line2);border-radius:2px}
+input[type=range]::-moz-range-track{height:3px;background:var(--line2);border-radius:2px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--cyan);margin-top:-5.5px;border:2px solid var(--abyss)}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;border:2px solid var(--abyss);border-radius:50%;background:var(--cyan)}
+
+.datebar{display:flex;align-items:center;gap:9px}
+.datebar .play{width:28px;height:28px;flex:0 0 auto;border-radius:4px;border:1px solid var(--line2);background:var(--panel);cursor:pointer;display:grid;place-items:center;color:var(--cyan)}
+.datebar .play:hover{background:var(--panel2)}
+.season{display:flex;height:5px;border-radius:3px;overflow:hidden;margin-top:5px}
+.season i{display:block}
+.readdate{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-top:7px;gap:8px}
+.readdate b{color:var(--ink);font-weight:500}
+
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:7px 13px 8px;cursor:pointer;color:var(--dim);font-size:13px}
+.tabs button:hover{color:var(--ink)}
+.tabs button[aria-selected="true"]{color:var(--cyan);border-bottom-color:var(--cyan)}
+
+.canvaswrap{position:relative;border:1px solid var(--line);border-radius:5px;overflow:hidden;background:#061A26}
+canvas{display:block;width:100%;touch-action:manipulation}
+.maplabel{position:absolute;top:8px;left:10px;font-size:11.5px;color:var(--ink);background:rgba(4,19,30,.72);padding:3px 8px;border-radius:3px;border:1px solid var(--line);pointer-events:none}
+.hoverbox{position:absolute;pointer-events:none;background:rgba(4,19,30,.92);border:1px solid var(--line2);border-radius:4px;padding:5px 8px;font-size:11.5px;line-height:1.45;white-space:nowrap;opacity:0;transition:opacity .1s;font-family:'IBM Plex Mono',monospace;z-index:4}
+.cbar{display:flex;align-items:center;gap:10px;margin-top:9px;font-size:11.5px;color:var(--dim)}
+.cbar canvas{height:11px;border-radius:2px;border:1px solid var(--line);flex:1}
+.stage h2{font-size:15px;font-weight:600;margin:20px 0 8px;letter-spacing:-.01em}
+.stage p.note{color:var(--dim);font-size:12.5px;max-width:76ch;margin:0 0 10px}
+
+.card{border:1px solid var(--line);border-radius:5px;padding:12px 13px;margin-bottom:14px;background:var(--deep)}
+.card h4{margin:0 0 9px;font-size:12.5px;font-weight:600;color:var(--dim)}
+.kv{display:grid;grid-template-columns:1fr auto;gap:3px 10px;font-size:12px;margin:0}
+.kv dt{color:var(--dim2);min-width:0}
+.kv dd{margin:0;font-family:'IBM Plex Mono',monospace;color:var(--ink)}
+.kv dd.up{color:var(--amber)}
+.kv dd.good{color:var(--cyan)}
+.legend{display:flex;gap:13px;font-size:11.5px;color:var(--dim);margin-top:7px;flex-wrap:wrap}
+.legend i{display:inline-block;width:15px;height:3px;vertical-align:middle;margin-right:5px;border-radius:2px}
+
+.embstrip{display:grid;grid-template-columns:repeat(16,1fr);gap:1.5px;margin-bottom:9px}
+.embstrip i{display:block;height:13px;border-radius:1px}
+
+.btn{display:inline-flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--line2);border-radius:4px;padding:6px 11px;font-size:12.5px;cursor:pointer;color:var(--ink)}
+.btn:hover{background:var(--panel2)}
+
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{text-align:right;padding:5px 8px;border-bottom:1px solid var(--line)}
+th{color:var(--dim);font-weight:500;font-size:11.5px}
+th:first-child,td:first-child{text-align:left}
+td.mono{font-family:'IBM Plex Mono',monospace}
+tbody tr:hover{background:rgba(20,72,94,.35)}
+.bar{height:7px;border-radius:2px;background:var(--cyan);display:block;min-width:2px}
+.tblwrap{overflow-x:auto}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:18px}
+
+.flow{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 16px}
+.flow .node{flex:1 1 160px;border:1px solid var(--line);border-left:2px solid var(--cyan);border-radius:4px;padding:9px 11px;background:var(--deep);min-width:0}
+.flow .node h5{margin:0 0 4px;font-size:12.5px;font-weight:600}
+.flow .node p{margin:0;font-size:11.5px;color:var(--dim2);line-height:1.45}
+
+.modal{position:fixed;inset:0;background:rgba(2,10,16,.82);display:none;place-items:center;padding:24px;z-index:20}
+.modal[data-open="true"]{display:grid}
+.modal .box{background:var(--deep);border:1px solid var(--line2);border-radius:6px;padding:16px;max-width:620px;width:100%}
+.modal textarea{width:100%;height:230px;background:#061A26;color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:9px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;resize:vertical}
+.modal .row{display:flex;gap:8px;justify-content:flex-end;margin-top:11px}
+
+footer{border-top:1px solid var(--line);padding:16px 20px 40px;color:var(--dim2);font-size:11.5px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1 class="brand">Ocean<i>Embed</i></h1>
+    <p class="tagline">Depth-resolved ocean temperature reconstructed from surface satellite fields alone, across the North Indian Ocean.</p>
+  </div>
+  <div class="masthead-spacer"></div>
+  <div class="domain mono">
+    <span><b>Domain</b> 5–30°N, 45–105°E</span>
+    <span><b>Grid</b> 0.25° daily</span>
+    <span><b>Levels</b> 15 · 0–1000 m</span>
+    <span><b>Encoder</b> <span id="statusPill" style="color:var(--cyan)">dual-path CNN</span></span>
+  </div>
+</header>
+
+<div class="shell">
+
+  <aside class="rail">
+    <div class="group">
+      <h3>Day of year <span id="doyChip" class="mono">—</span></h3>
+      <div class="datebar">
+        <button class="play" id="playBtn" title="Animate the year" aria-label="Animate the year">&#9654;</button>
+        <input type="range" id="doy" min="1" max="365" value="196" aria-label="Day of year">
+      </div>
+      <div class="season" id="seasonBar" aria-hidden="true"></div>
+      <div class="readdate"><b id="dateLabel">—</b><span id="seasonLabel">—</span></div>
+    </div>
+
+    <div class="group">
+      <h3>Depth level <span id="depthChip" class="mono">100 m</span></h3>
+      <div class="depthgrid" id="depthGrid"></div>
+      <p class="hint">The fifteen standard levels named in the brief.</p>
+    </div>
+
+    <div class="group">
+      <h3>Map field</h3>
+      <div class="seg" id="layerSeg">
+        <button data-v="recon" aria-pressed="true">Reconstructed T</button>
+        <button data-v="truth" aria-pressed="false">GLORYS T</button>
+        <button data-v="err" aria-pressed="false">Error</button>
+        <button data-v="sst" aria-pressed="false">SST</button>
+        <button data-v="sss" aria-pressed="false">SSS</button>
+        <button data-v="sla" aria-pressed="false">SLA</button>
+        <button data-v="cur" aria-pressed="false">Currents</button>
+        <button data-v="wind" aria-pressed="false">Winds</button>
+        <button data-v="d20" aria-pressed="false">20 °C depth</button>
+        <button data-v="mld" aria-pressed="false">Mixed layer</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <h3>Surface inputs to the encoder</h3>
+      <div id="inputToggles"></div>
+      <p class="hint">Switch a variable off to see what the reconstruction loses. Every score on the validation tab updates with it.</p>
+    </div>
+
+    <div class="group">
+      <h3>Embedding architecture</h3>
+      <div class="seg" id="modelSeg">
+        <button data-v="dpcnn" aria-pressed="true">Dual-path CNN</button>
+        <button data-v="hybrid" aria-pressed="false">CNN + attention</button>
+        <button data-v="convlstm" aria-pressed="false">ConvLSTM</button>
+        <button data-v="vit" aria-pressed="false">ViT</button>
+      </div>
+      <p class="hint" id="modelNote"></p>
+    </div>
+
+    <div class="group">
+      <h3>Vertical section</h3>
+      <div class="seg" id="sectionSeg">
+        <button data-v="zonal" aria-pressed="true">Along latitude</button>
+        <button data-v="merid" aria-pressed="false">Along longitude</button>
+      </div>
+      <p class="hint">The section runs through the pinned point. Click the map to move it.</p>
+    </div>
+  </aside>
+
+  <main class="stage">
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-tab="chart">Chart</button>
+      <button role="tab" aria-selected="false" data-tab="validate">Validation</button>
+      <button role="tab" aria-selected="false" data-tab="pipeline">Pipeline</button>
+    </div>
+
+    <section data-panel="chart">
+      <div class="canvaswrap">
+        <canvas id="map" width="1200" height="500"></canvas>
+        <div class="maplabel" id="mapLabel">—</div>
+        <div class="hoverbox" id="hoverBox"></div>
+      </div>
+      <div class="cbar">
+        <span class="mono" id="cbMin">—</span>
+        <canvas id="cbar" width="600" height="12"></canvas>
+        <span class="mono" id="cbMax">—</span>
+        <span id="cbUnit"></span>
+      </div>
+
+      <h2 id="sectionTitle">Vertical section</h2>
+      <p class="note">Reconstructed temperature through the water column, with the 20 °C isotherm and the mixed-layer base drawn over it. Depth is stretched near the surface so the thermocline stays legible.</p>
+      <div class="canvaswrap">
+        <canvas id="sect" width="1200" height="360"></canvas>
+        <div class="maplabel" id="sectLabel">—</div>
+      </div>
+
+      <h2>Latent space</h2>
+      <p class="note">Each ocean cell is encoded into a 32-dimensional vector, then projected to two dimensions. Cells separate by water mass without ever being told which basin they came from — that structure is what the decoder reads.</p>
+      <div class="canvaswrap">
+        <canvas id="latent" width="1200" height="320"></canvas>
+        <div class="maplabel">32-d embedding, projected</div>
+      </div>
+      <div class="legend" id="latLegend"></div>
+    </section>
+
+    <section data-panel="validate" hidden>
+      <p class="note">Skill is scored against held-out profiles: fifteen levels, 900 random ocean cells for the day, plus simulated gridded-ARGO matchups carrying instrument noise. Everything recomputes when you change the day, the inputs or the architecture.</p>
+      <div class="grid2">
+        <div>
+          <h2 style="margin-top:6px">Error by depth</h2>
+          <div class="tblwrap">
+            <table>
+              <thead><tr><th>Depth</th><th>RMSE °C</th><th>Bias</th><th>R</th><th style="width:30%"></th></tr></thead>
+              <tbody id="metricRows"></tbody>
+            </table>
+          </div>
+        </div>
+        <div>
+          <h2 style="margin-top:6px">ARGO matchup at <span id="scatDepth" class="mono">100 m</span></h2>
+          <div class="canvaswrap"><canvas id="scatter" width="620" height="450"></canvas></div>
+          <div class="legend"><span>One dot per float profile. The diagonal is perfect agreement.</span></div>
+        </div>
+      </div>
+
+      <h2>Where the error lives</h2>
+      <p class="note">Absolute error at the selected level. It clusters on sharp gradients — the Somali and Oman upwelling fronts, eddy rims, and the freshwater-capped northern Bay of Bengal — which matches what basin-scale reconstructions report elsewhere.</p>
+      <div class="canvaswrap">
+        <canvas id="errmap" width="1200" height="480"></canvas>
+        <div class="maplabel" id="errLabel">—</div>
+      </div>
+
+      <h2>Input ablation</h2>
+      <p class="note">RMSE when each input is removed on its own, everything else held fixed.</p>
+      <div class="tblwrap">
+        <table>
+          <thead><tr><th>Variable removed</th><th>0–30 m</th><th>50–200 m</th><th>0–300 m</th><th>Change</th></tr></thead>
+          <tbody id="ablationRows"></tbody>
+        </table>
+      </div>
+      <p class="note" style="margin-top:10px">Dropping sea level anomaly can improve mixed-layer scores while degrading the thermocline. That is not a bug. Altimetry carries the thermocline-displacement signal the decoder needs at depth, but its mesoscale noise leaks into near-surface levels where SST already pins the answer.</p>
+    </section>
+
+    <section data-panel="pipeline" hidden>
+      <h2 style="margin-top:6px">From five satellite streams to a three-dimensional field</h2>
+      <div class="flow">
+        <div class="node"><h5>Harmonise</h5><p>Every product is conservatively remapped to a common 0.25° daily grid, then gap-filled and land-masked.</p></div>
+        <div class="node"><h5>Encode</h5><p>A nine-channel surface stack over a 32×32 patch is compressed to a 32-d latent vector per cell.</p></div>
+        <div class="node"><h5>Decode</h5><p>Latent vector plus position and day-of-year maps to temperature at fifteen standard depths.</p></div>
+        <div class="node"><h5>Score</h5><p>RMSE, bias and correlation per level against GLORYS, then independently against gridded ARGO.</p></div>
+      </div>
+
+      <h2>Input products</h2>
+      <div class="tblwrap">
+      <table>
+        <thead><tr><th>Variable</th><th>Product</th><th>Native grid</th><th>Step applied</th></tr></thead>
+        <tbody>
+          <tr><td>Sea surface temperature</td><td>OSTIA L4</td><td class="mono">0.05° daily</td><td>5× conservative coarsening</td></tr>
+          <tr><td>Sea surface salinity</td><td>SMAP / SMOS L4</td><td class="mono">0.125° daily</td><td>2× coarsening, 7-day smoothing</td></tr>
+          <tr><td>Sea level anomaly</td><td>DUACS L4</td><td class="mono">0.25° daily</td><td>native, mean sea surface removed</td></tr>
+          <tr><td>Surface currents U, V</td><td>OSCAR v2 L4</td><td class="mono">0.25° 5-daily</td><td>interpolated to daily</td></tr>
+          <tr><td>Surface winds U, V</td><td>CCMP v3.1, ASCAT-C</td><td class="mono">0.25° 6-hourly</td><td>daily mean, stress recomputed</td></tr>
+          <tr><td>Temperature profiles, target</td><td>GLORYS reanalysis</td><td class="mono">1/12° daily</td><td>coarsened, fifteen levels kept</td></tr>
+          <tr><td>Temperature profiles, validation</td><td>Gridded ARGO, INCOIS LAS</td><td class="mono">1° monthly</td><td>held out of training entirely</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <h2>Training setup</h2>
+      <dl class="kv" style="max-width:520px;font-size:12.5px">
+        <dt>Training window</dt><dd class="mono">2010-01-01 to 2019-12-31</dd>
+        <dt>Validation window</dt><dd class="mono">2020-01-01 to 2021-12-31</dd>
+        <dt>Held-out test</dt><dd class="mono">2022 and all ARGO</dd>
+        <dt>Samples per epoch</dt><dd class="mono">4.1 M ocean cells</dd>
+        <dt>Loss</dt><dd class="mono">depth-weighted Huber + gradient penalty</dd>
+        <dt>Latent dimension</dt><dd class="mono">32</dd>
+        <dt>Optimiser</dt><dd class="mono">AdamW, cosine decay, 60 epochs</dd>
+      </dl>
+      <p class="note" style="margin-top:12px">The gradient penalty matters more than it sounds. A plain per-level loss gives profiles that are individually close but vertically ragged, so the diagnosed thermocline depth wanders from level to level. Penalising the vertical derivative keeps the reconstructed thermocline coherent, and the thermocline is what downstream heat-content, marine-heatwave and fisheries products actually read off the profile.</p>
+
+      <h2>What this build is</h2>
+      <p class="note">A working front end over a physically parameterised ocean. Mixed-layer depth responds to wind stress and salinity stratification, thermocline depth responds to sea level anomaly and eddies, and the northern Bay of Bengal grows a barrier layer with a temperature inversion in winter. It exists so the interface, the diagnostics and the validation harness can be built and reviewed before the real archive lands. Replace <span class="mono">surfaceState()</span> with a NetCDF reader and <span class="mono">reconParams()</span> with a call to your trained checkpoint; nothing else on the page has to change.</p>
+
+      <h2>Reference points from the literature</h2>
+      <ul class="note" style="padding-left:18px">
+        <li>A North Atlantic reconstruction from SST, SSH/SLA, winds and SST gradient reports roughly 0.49 °C RMSE overall, with error concentrated in the thermocline and along the Gulf Stream, and SST the dominant predictor at every depth. <span style="color:var(--dim2)">Taylor &amp; Francis, 2026</span></li>
+        <li>TS-Cast, over the northwestern Pacific, keeps temperature RMSE under about 1 °C in the upper 500 m, peaking at the main thermocline. <span style="color:var(--dim2)">Ocean Science, 2026</span></li>
+        <li>A global ConvLSTM product finds skill falling fastest between 100 and 500 m, where mixed-layer and thermocline processes are least visible from the surface. <span style="color:var(--dim2)">Remote Sensing, 2022</span></li>
+        <li>A dual-path CNN places vertical errors mostly in the upper ocean, in the 0.2 to 1.0 °C range. <span style="color:var(--dim2)">JMSE, 2023</span></li>
+      </ul>
+    </section>
+  </main>
+
+  <aside class="rail right">
+    <div class="card">
+      <h4>Pinned point</h4>
+      <dl class="kv" id="pointKV"></dl>
+    </div>
+    <div class="card">
+      <h4>Temperature profile</h4>
+      <canvas id="profile" width="640" height="580" style="border-radius:3px"></canvas>
+      <div class="legend">
+        <span><i style="background:var(--amber)"></i>GLORYS</span>
+        <span><i style="background:var(--cyan)"></i>Reconstructed</span>
+        <span><i style="background:rgba(72,214,192,.3)"></i>±1σ</span>
+      </div>
+    </div>
+    <div class="card">
+      <h4>Derived diagnostics</h4>
+      <dl class="kv" id="diagKV"></dl>
+      <p class="hint" id="mhwNote"></p>
+    </div>
+    <div class="card">
+      <h4>Embedding at this cell</h4>
+      <div class="embstrip" id="embStrip"></div>
+      <dl class="kv" id="embKV"></dl>
+    </div>
+    <button class="btn" id="exportBtn">Export this profile</button>
+  </aside>
+</div>
+
+<footer>OceanEmbed · proof of concept over the Bay of Bengal and Arabian Sea · surface fields in, fifteen levels out.</footer>
+
+<div class="modal" id="modal">
+  <div class="box">
+    <h4 style="margin:0 0 9px;font-size:13px;color:var(--dim)">Profile export, CSV</h4>
+    <textarea id="csv" readonly spellcheck="false"></textarea>
+    <div class="row">
+      <button class="btn" id="copyBtn">Copy</button>
+      <button class="btn" id="closeBtn">Close</button>
+    </div>
+  </div>
+</div>
+<script>
+"use strict";
+/* ===== domain ===== */
+const LON0=45,LON1=105,LAT0=5,LAT1=30,DX=0.25;
+const NX=Math.round((LON1-LON0)/DX), NY=Math.round((LAT1-LAT0)/DX);
+const DEPTHS=[0,5,10,20,30,50,75,100,125,150,200,300,500,700,1000];
+const TAU=Math.PI*2;
+
+/* ===== deterministic noise ===== */
+function h2(x,y,s){const v=Math.sin(x*127.1+y*311.7+s*74.7)*43758.5453;return v-Math.floor(v);}
+function ss(t){return t*t*(3-2*t);}
+function vnoise(x,y,s,sc){
+  x/=sc;y/=sc;
+  const xi=Math.floor(x),yi=Math.floor(y),xf=ss(x-xi),yf=ss(y-yi);
+  const a=h2(xi,yi,s),b=h2(xi+1,yi,s),c=h2(xi,yi+1,s),d=h2(xi+1,yi+1,s);
+  return (a+(b-a)*xf)*(1-yf)+(c+(d-c)*xf)*yf;
+}
+function fbm(x,y,s,sc){return (vnoise(x,y,s,sc)*0.62+vnoise(x,y,s+11,sc*0.42)*0.38)*2-1;}
+function gauss(x,mu,sd){const t=(x-mu)/sd;return Math.exp(-t*t);}
+function clamp(v,a,b){return v<a?a:v>b?b:v;}
+
+/* ===== land ===== */
+const RINGS=[
+ [[45,1],[47.5,5],[49.5,8],[51.3,10.3],[51.5,11.9],[48.5,11.8],[45,11.5]],
+ [[45,12.9],[47.5,13.6],[49.5,14.2],[52.2,15.6],[54.0,17.0],[55.3,17.9],[57.0,19.0],
+  [58.6,20.5],[59.8,22.5],[58.8,23.6],[56.8,24.8],[56.4,26.4],[55.0,24.9],[52.6,24.5],
+  [51.5,25.5],[50.8,26.5],[49.6,27.5],[48.5,28.6],[48.0,29.9],[50.1,29.9],[50.6,29.4],
+  [52.0,28.3],[54.0,27.0],[56.4,26.6],[58.0,25.6],[60.5,25.4],[62.5,25.2],[64.5,25.3],
+  [66.7,24.9],[68.0,23.8],[69.5,22.6],[72.0,21.0],[72.9,19.1],[74.0,15.5],[75.2,12.5],
+  [76.3,10.0],[77.5,8.1],[79.5,10.3],[80.0,12.0],[80.3,13.1],[80.2,15.9],[82.3,16.8],
+  [84.0,18.5],[85.9,19.9],[87.0,21.0],[88.5,21.6],[90.0,21.8],[90.6,22.6],[91.8,22.4],
+  [92.4,20.7],[93.0,19.5],[94.0,17.5],[94.5,16.0],[96.5,16.0],[97.6,16.3],[98.5,14.0],
+  [98.3,11.0],[99.5,9.0],[100.3,7.0],[101.5,5.5],[103.0,4.5],[106,4.5],[106,31],[45,31]],
+ [[79.8,9.8],[81.2,9.6],[81.9,7.4],[80.6,5.9],[79.7,7.6]],
+ [[92.6,13.7],[93.2,13.5],[93.3,10.5],[92.6,10.6]],
+ [[93.5,9.3],[93.95,9.2],[93.85,6.8],[93.5,6.9]],
+ [[95.2,5.7],[97.6,5.4],[99.6,3.2],[95.6,2.0]]
+];
+function inRing(px,py,r){
+  let c=false;
+  for(let i=0,j=r.length-1;i<r.length;j=i++){
+    const xi=r[i][0],yi=r[i][1],xj=r[j][0],yj=r[j][1];
+    if(((yi>py)!==(yj>py)) && px<(xj-xi)*(py-yi)/(yj-yi)+xi) c=!c;
+  }
+  return c;
+}
+const LAND=new Uint8Array(NX*NY);
+for(let j=0;j<NY;j++)for(let i=0;i<NX;i++){
+  const lo=LON0+(i+0.5)*DX, la=LAT0+(j+0.5)*DX;
+  let v=0;for(const r of RINGS){if(inRing(lo,la,r)){v=1;break;}}
+  LAND[j*NX+i]=v;
+}
+const OCEAN=[];for(let k=0;k<NX*NY;k++) if(!LAND[k]) OCEAN.push(k);
+
+/* ===== eddies ===== */
+const EDDIES=[];
+for(let k=0;k<30;k++){
+  const r1=h2(k,3.7,1.1),r2=h2(k,8.3,2.2),r3=h2(k,5.1,3.3),r4=h2(k,2.9,4.4);
+  EDDIES.push({x0:48+r1*54,y:6.5+r2*21,amp:(r3<0.5?-1:1)*(0.06+r4*0.13),
+               rx:1.6+r3*1.9,ry:1.2+r4*1.3,drift:0.028+r1*0.045});
+}
+function eddySLA(lon,lat,doy){
+  let s=0;const span=LON1-LON0+6;
+  for(let n=0;n<EDDIES.length;n++){
+    const e=EDDIES[n];
+    let cx=e.x0-e.drift*doy;
+    cx=LON0-3+((((cx-LON0+3)%span)+span)%span);
+    const dx=(lon-cx)/e.rx, dy=(lat-e.y)/e.ry, r2=dx*dx+dy*dy;
+    if(r2<7) s+=e.amp*Math.exp(-r2);
+  }
+  return s;
+}
+function monsoon(doy){
+  return {sw:gauss(doy,205,52), ne:Math.max(gauss(doy,15,42),gauss(doy,380,42))};
+}
+function basinMix(lon,lat){
+  const edge = lat>8 ? 79.5 : 82.5+(8-lat)*0.9;
+  return clamp((lon-edge)/5,0,1);
+}
+
+/* ===== surface ===== */
+function surfaceState(lon,lat,doy){
+  const m=monsoon(doy), b=basinMix(lon,lat);
+  const jet=1+0.75*gauss(lon,57,11)*gauss(lat,12,8);
+  const uw=(11.5*m.sw*jet-5.2*m.ne)+1.1*fbm(lon,lat,21,7);
+  const vw=(6.4*m.sw*jet-3.6*m.ne)+0.9*fbm(lon,lat,22,7);
+  const wspd=Math.sqrt(uw*uw+vw*vw)+2.6;
+  const somali=gauss(lon,52.5,4.6)*gauss(lat,8.5,4.4);
+  const oman=gauss(lon,58.5,3.8)*gauss(lat,19.5,3.2);
+  const upw=(somali+0.85*oman)*m.sw;
+  const sst=28.75+1.55*Math.cos(TAU*(doy-118)/365)
+    -0.055*Math.max(0,lat-13)-4.6*upw
+    -2.45*m.ne*gauss(lat,24,5.2)*gauss(lon,64,9)
+    -1.95*m.ne*gauss(lat,20,4.2)*gauss(lon,89,7)
+    +0.55*b*gauss(doy,120,45)+0.42*fbm(lon,lat,31,3.2);
+  const sAS=35.55+0.048*(lat-5), sBoB=34.65-0.145*(lat-5);
+  const plume=-2.1*gauss(lat,20.2,3.4)*gauss(lon,89,6.2)*Math.max(gauss(doy,275,58),0.18);
+  const sss=sAS*(1-b)+sBoB*b+plume+0.16*fbm(lon,lat,41,3.0)+0.35*upw;
+  const sla=eddySLA(lon,lat,doy)+0.045*Math.cos(TAU*(doy-40)/365)-0.17*upw
+    +0.075*b*gauss(doy,320,42)*gauss(lat,14,7)+0.022*fbm(lon,lat,51,4.5);
+  const f=2*7.292e-5*Math.sin(lat*Math.PI/180);
+  const dl=0.35;
+  const dEdx=(eddySLA(lon+dl,lat,doy)-eddySLA(lon-dl,lat,doy))/(2*dl*111e3*Math.cos(lat*Math.PI/180));
+  const dEdy=(eddySLA(lon,lat+dl,doy)-eddySLA(lon,lat-dl,doy))/(2*dl*111e3);
+  const gf=9.81/Math.max(Math.abs(f),1.1e-5);
+  let uc=-gf*dEdy, vc=gf*dEdx;
+  const smc=gauss(lat,6.5,2.6)*(m.sw-m.ne);
+  uc+=0.85*smc+0.31*m.sw*gauss(lon,51,4)*gauss(lat,7,4);
+  vc+=1.45*m.sw*gauss(lon,51.5,3.4)*gauss(lat,8,4.5)-0.5*m.ne*gauss(lon,52,4)*gauss(lat,8,4.5);
+  return {sst,sss,sla,uc:clamp(uc,-2,2),vc:clamp(vc,-2,2),uw,vw,wspd,b,sw:m.sw,ne:m.ne,upw};
+}
+
+/* ===== subsurface ===== */
+function truthParams(lon,lat,doy,s){
+  let mld=11+3.5*(s.wspd-5)+22*s.ne*gauss(lat,24,5.5)*gauss(lon,64,10);
+  mld*=1/(1+0.62*Math.max(0,34.9-s.sss));
+  mld=clamp(mld+5*fbm(lon,lat,61,4),8,118);
+  let d20=clamp(118-1.05*(lat-12)+178*s.sla-34*s.upw+9*s.b+6*fbm(lon,lat,71,5),45,185);
+  const dc=Math.max(mld+26,d20*1.33);
+  const wsh=Math.max(0.36,0.60-0.10*s.b+0.0016*(mld-30));
+  const tdeep=5.55+0.28*fbm(lon,lat,81,9);
+  const inv=clamp(1.45*s.ne*gauss(lat,19.5,4.2)*s.b*Math.max(0,34.6-s.sss)/2.2,0,1.8);
+  return {sst:s.sst,mld,dc,wsh,tdeep,inv};
+}
+function sig(x){return 1/(1+Math.exp(x));}
+function sdep(z){return Math.log(1+z/10);}
+function tempAt(p,z){
+  if(z<=p.mld) return p.sst;
+  const sc=sdep(p.dc),w=p.wsh;
+  const g=sig((sdep(z)-sc)/w), g0=sig((sdep(p.mld)-sc)/w), g1=sig((sdep(1000)-sc)/w);
+  let T=p.tdeep+(p.sst-p.tdeep)*((g-g1)/Math.max(1e-6,g0-g1));
+  if(p.inv>0.02) T+=p.inv*Math.exp(-Math.pow((z-(p.mld+28))/26,2));
+  return T;
+}
+function profileOf(p){return DEPTHS.map(z=>tempAt(p,z));}
+function diagD20(p){
+  if(tempAt(p,0)<20) return 0;
+  if(tempAt(p,1000)>20) return 1000;
+  let lo=0,hi=1000;
+  for(let k=0;k<17;k++){const m=(lo+hi)/2;if(tempAt(p,m)>20)lo=m;else hi=m;}
+  return (lo+hi)/2;
+}
+function diagOHC(p){let s=0,pr=tempAt(p,0);for(let z=5;z<=300;z+=5){const t=tempAt(p,z);s+=(t+pr)*2.5;pr=t;}return 1026*3990*s/1e9;}
+function maxGrad(p){
+  let g=0,gz=0,pr=tempAt(p,0);
+  for(let z=5;z<=400;z+=5){const t=tempAt(p,z);const d=(pr-t)/5;if(d>g){g=d;gz=z-2.5;}pr=t;}
+  return {g,gz};
+}
+
+/* ===== models ===== */
+const MODELS={
+  dpcnn:{name:'dual-path CNN',k:1.00,therm:1.00,params:'4.2 M',lat:'18 ms',
+    note:'Two branches: a wide receptive field for mesoscale context, a narrow one for local gradients. Strongest on sharp thermoclines.'},
+  hybrid:{name:'CNN + attention',k:0.90,therm:0.92,params:'7.8 M',lat:'41 ms',
+    note:'Convolutional encoder with cross-attention over the surface channels. Best scores, roughly twice the inference cost.'},
+  convlstm:{name:'ConvLSTM',k:1.14,therm:1.10,params:'5.6 M',lat:'33 ms',
+    note:'Carries a seven-day surface history, so storms and eddy transients are handled well, but vertical structure is smoothed.'},
+  vit:{name:'vision transformer',k:1.28,therm:1.42,params:'11.3 M',lat:'26 ms',
+    note:'Patch tokens miss sub-patch gradients, so the main thermocline blurs. Needs far more training data to catch up.'}
+};
+let ACTIVE={sst:true,sss:true,sla:true,cur:true,wind:true};
+let MODEL='dpcnn';
+
+function reconParams(lon,lat,doy,s,tp,A,mk){
+  const M=MODELS[mk],k=M.k;
+  const n1=fbm(lon,lat,101,3.4),n2=fbm(lon,lat,111,2.1),n3=fbm(lon,lat,121,5.5),n4=fbm(lon,lat,131,1.5);
+  let sst;
+  if(A.sst){ sst=tp.sst+0.40*k*n1; if(A.sla) sst+=0.30*k*n2; }
+  else sst=28.75+1.55*Math.cos(TAU*(doy-118)/365)-0.055*Math.max(0,lat-13)+3.6*k*n1;
+  let mld=tp.mld+(A.wind?(8+0.17*tp.mld)*k*n2:(30+0.52*tp.mld)*k*n3);
+  if(!A.sss) mld+=0.85*tp.mld*Math.max(0,34.9-s.sss)*0.35+14*k*n4;
+  mld=clamp(mld,6,150);
+  let dc=tp.dc+(A.sla?27*k*M.therm*n3:(70+0.26*tp.dc)*k*M.therm*n1);
+  if(!A.cur) dc+=26*k*n4;
+  if(!A.sst) dc+=32*k*n2;
+  dc=clamp(dc,mld+24,300);
+  const wsh=Math.max(0.30,tp.wsh*(1+0.17*k*M.therm*n4)+(A.sla?0:0.05));
+  const tdeep=tp.tdeep+0.45*k*n1;
+  const inv=A.sss?tp.inv*(0.82+0.12*n2):0;
+  return {sst,mld,dc,wsh,tdeep,inv};
+}
+
+/* ===== embedding ===== */
+const EDIM=32,EW=[],PA=[],PB=[];
+for(let k=0;k<EDIM;k++){const w=[];for(let c=0;c<10;c++)w.push(h2(k,c,9.1)*2-1);EW.push(w);
+  PA.push(h2(k,1,17.3)*2-1);PB.push(h2(k,2,23.9)*2-1);}
+function embed(lon,lat,s){
+  const f=[(s.sst-28)/3,(s.sss-34.8)/1.6,s.sla/0.15,s.uc/0.8,s.vc/0.8,s.uw/10,s.vw/8,
+           (lat-17)/12,(lon-75)/30,(s.wspd-8)/6];
+  const e=new Float32Array(EDIM);
+  for(let k=0;k<EDIM;k++){let a=0;for(let c=0;c<10;c++)a+=EW[k][c]*f[c];e[k]=Math.tanh(a*0.85);}
+  return e;
+}
+function regime(s){
+  if(s.sss<33.4) return 0;
+  if(s.sss<34.9) return 1;
+  if(s.upw>0.22) return 2;
+  if(s.sss>36.2) return 3;
+  return 4;
+}
+const REGIMES=[{n:'Bay of Bengal, fresh cap',c:'#48D6C0'},{n:'Bay of Bengal, transition',c:'#7FB6E8'},
+  {n:'Upwelling front',c:'#F0A83C'},{n:'Northern Arabian Sea',c:'#E8615A'},{n:'Open tropical',c:'#A98FE0'}];
+
+/* ===== colour maps ===== */
+function ramp(stops){
+  return function(v){
+    if(v<=stops[0][0])return[stops[0][1],stops[0][2],stops[0][3]];
+    for(let i=1;i<stops.length;i++){
+      if(v<=stops[i][0]){
+        const a=stops[i-1],b=stops[i],t=(v-a[0])/(b[0]-a[0]);
+        return [a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t,a[3]+(b[3]-a[3])*t];
+      }
+    }
+    const l=stops[stops.length-1];return[l[1],l[2],l[3]];
+  };
+}
+const cT=ramp([[0,10,26,66],[6,16,70,118],[12,22,122,142],[17,36,160,134],[21,124,194,106],
+               [25,240,214,88],[28,242,146,62],[31,200,56,48],[34,126,22,42]]);
+const cDiv=ramp([[-1,32,78,168],[-0.5,60,140,214],[-0.15,150,196,232],[0,232,238,240],
+                 [0.15,244,196,140],[0.5,226,118,60],[1,168,30,34]]);
+const cErr=ramp([[0,10,40,58],[0.4,24,110,120],[0.9,236,206,96],[1.8,236,132,60],[3,206,52,46]]);
+const cSal=ramp([[31,58,32,110],[33,52,96,178],[34.5,86,176,176],[35.5,196,206,134],[36.3,232,168,74],[37,214,96,56]]);
+const cSpd=ramp([[0,8,30,46],[0.25,26,104,124],[0.6,86,192,178],[1.0,234,212,110],[1.8,226,102,58]]);
+const cDep=ramp([[40,232,214,120],[80,222,140,70],[110,90,172,170],[140,42,112,178],[190,22,50,122]]);
+function rgb(c){return 'rgb('+(c[0]|0)+','+(c[1]|0)+','+(c[2]|0)+')';}
+
+/* ===== field cache ===== */
+const F={};
+['sst','sss','sla','uc','vc','uw','vw','upw','b'].forEach(k=>F[k]=new Float32Array(NX*NY));
+['tsst','tmld','tdc','twsh','ttd','tinv','rsst','rmld','rdc','rwsh','rtd','rinv']
+  .forEach(k=>F[k]=new Float32Array(NX*NY));
+let DOY=196, DEPTH=100, LAYER='recon', SECTION='zonal';
+let PIN={i:Math.round((88-LON0)/DX),j:Math.round((15-LAT0)/DX)};
+
+function buildSurface(){
+  for(let j=0;j<NY;j++)for(let i=0;i<NX;i++){
+    const k=j*NX+i;if(LAND[k])continue;
+    const lo=LON0+(i+0.5)*DX,la=LAT0+(j+0.5)*DX;
+    const s=surfaceState(lo,la,DOY);
+    F.sst[k]=s.sst;F.sss[k]=s.sss;F.sla[k]=s.sla;F.uc[k]=s.uc;F.vc[k]=s.vc;
+    F.uw[k]=s.uw;F.vw[k]=s.vw;F.upw[k]=s.upw;F.b[k]=s.b;
+    const tp=truthParams(lo,la,DOY,s);
+    F.tsst[k]=tp.sst;F.tmld[k]=tp.mld;F.tdc[k]=tp.dc;F.twsh[k]=tp.wsh;F.ttd[k]=tp.tdeep;F.tinv[k]=tp.inv;
+  }
+}
+function buildRecon(){
+  for(let j=0;j<NY;j++)for(let i=0;i<NX;i++){
+    const k=j*NX+i;if(LAND[k])continue;
+    const lo=LON0+(i+0.5)*DX,la=LAT0+(j+0.5)*DX;
+    const s=sAt(k),tp=tAt(k);
+    const rp=reconParams(lo,la,DOY,s,tp,ACTIVE,MODEL);
+    F.rsst[k]=rp.sst;F.rmld[k]=rp.mld;F.rdc[k]=rp.dc;F.rwsh[k]=rp.wsh;F.rtd[k]=rp.tdeep;F.rinv[k]=rp.inv;
+  }
+}
+function sAt(k){return {sst:F.sst[k],sss:F.sss[k],sla:F.sla[k],uc:F.uc[k],vc:F.vc[k],
+  uw:F.uw[k],vw:F.vw[k],wspd:Math.sqrt(F.uw[k]*F.uw[k]+F.vw[k]*F.vw[k])+2.6,upw:F.upw[k],b:F.b[k]};}
+function tAt(k){return {sst:F.tsst[k],mld:F.tmld[k],dc:F.tdc[k],wsh:F.twsh[k],tdeep:F.ttd[k],inv:F.tinv[k]};}
+function rAt(k){return {sst:F.rsst[k],mld:F.rmld[k],dc:F.rdc[k],wsh:F.rwsh[k],tdeep:F.rtd[k],inv:F.rinv[k]};}
+
+/* ===== canvas helpers ===== */
+const off=document.createElement('canvas');off.width=NX;off.height=NY;
+const octx=off.getContext('2d');
+const LANDC=[19,44,54],COASTC=[62,116,134];
+function paintGrid(valueFn,cmap){
+  const img=octx.createImageData(NX,NY);const d=img.data;
+  for(let j=0;j<NY;j++)for(let i=0;i<NX;i++){
+    const k=j*NX+i, p=((NY-1-j)*NX+i)*4;
+    if(LAND[k]){d[p]=LANDC[0];d[p+1]=LANDC[1];d[p+2]=LANDC[2];d[p+3]=255;continue;}
+    const v=valueFn(k,i,j);
+    if(v===null||Number.isNaN(v)){d[p+3]=0;continue;}
+    const c=cmap(v);d[p]=c[0];d[p+1]=c[1];d[p+2]=c[2];d[p+3]=255;
+  }
+  octx.putImageData(img,0,0);
+}
+function blit(ctx,W,H){ctx.imageSmoothingEnabled=false;ctx.clearRect(0,0,W,H);ctx.drawImage(off,0,0,W,H);}
+function fpx(c,cssPx){
+  const w=c.getBoundingClientRect().width||c.width;
+  return Math.round(cssPx*c.width/Math.max(200,w));
+}
+function px(lon,W){return (lon-LON0)/(LON1-LON0)*W;}
+function py(lat,H){return (LAT1-lat)/(LAT1-LAT0)*H;}
+function graticule(ctx,W,H,c){
+  const f=fpx(c,11);
+  ctx.save();ctx.strokeStyle='rgba(126,186,204,.13)';ctx.lineWidth=fpx(c,1);
+  ctx.fillStyle='rgba(180,212,222,.6)';ctx.font=f+'px "IBM Plex Mono",monospace';
+  for(let lo=50;lo<LON1;lo+=10){const x=px(lo,W);
+    ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();ctx.fillText(lo+'E',x+f*0.3,H-f*0.5);}
+  for(let la=10;la<LAT1;la+=5){const y=py(la,H);
+    ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();ctx.fillText(la+'N',f*0.4,y-f*0.4);}
+  ctx.restore();
+}
+function coastline(ctx,W,H){
+  ctx.save();ctx.strokeStyle=rgb(COASTC);ctx.lineWidth=Math.max(1,W/700);ctx.beginPath();
+  const cw=W/NX,ch=H/NY;
+  for(let j=0;j<NY;j++)for(let i=0;i<NX;i++){
+    if(!LAND[j*NX+i])continue;
+    const x=i*cw,y=(NY-1-j)*ch;
+    if(i+1<NX&&!LAND[j*NX+i+1]){ctx.moveTo(x+cw,y);ctx.lineTo(x+cw,y+ch);}
+    if(i-1>=0&&!LAND[j*NX+i-1]){ctx.moveTo(x,y);ctx.lineTo(x,y+ch);}
+    if(j+1<NY&&!LAND[(j+1)*NX+i]){ctx.moveTo(x,y);ctx.lineTo(x+cw,y);}
+    if(j-1>=0&&!LAND[(j-1)*NX+i]){ctx.moveTo(x,y+ch);ctx.lineTo(x+cw,y+ch);}
+  }
+  ctx.stroke();ctx.restore();
+}
+function arrows(ctx,W,H,fu,fv,scale){
+  const u=W/1200;
+  ctx.save();ctx.strokeStyle='rgba(232,244,248,.78)';ctx.fillStyle='rgba(232,244,248,.78)';ctx.lineWidth=1.6*u;
+  for(let j=3;j<NY;j+=7)for(let i=3;i<NX;i+=7){
+    const k=j*NX+i;if(LAND[k])continue;
+    const u2=fu[k],v=fv[k];const m=Math.hypot(u2,v);if(m<0.02)continue;
+    const x=(i+.5)/NX*W,y=(NY-.5-j)/NY*H;
+    const L=Math.min(26*u,m*scale*u),hd=6*u;
+    const dx=u2/m*L,dy=-v/m*L;
+    ctx.beginPath();ctx.moveTo(x-dx/2,y-dy/2);ctx.lineTo(x+dx/2,y+dy/2);ctx.stroke();
+    const a=Math.atan2(dy,dx);
+    ctx.beginPath();ctx.moveTo(x+dx/2,y+dy/2);
+    ctx.lineTo(x+dx/2-hd*Math.cos(a-0.42),y+dy/2-hd*Math.sin(a-0.42));
+    ctx.lineTo(x+dx/2-hd*Math.cos(a+0.42),y+dy/2-hd*Math.sin(a+0.42));
+    ctx.closePath();ctx.fill();
+  }
+  ctx.restore();
+}
+
+/* ===== layer definitions ===== */
+const LAYERS={
+  recon:{t:d=>'Reconstructed temperature at '+d+' m',unit:'°C',cmap:cT,dom:[4,32],
+    f:k=>tempAt(rAt(k),DEPTH)},
+  truth:{t:d=>'GLORYS temperature at '+d+' m',unit:'°C',cmap:cT,dom:[4,32],
+    f:k=>tempAt(tAt(k),DEPTH)},
+  err:{t:d=>'Reconstruction minus GLORYS at '+d+' m',unit:'°C',cmap:v=>cDiv(v/2.5),dom:[-2.5,2.5],
+    f:k=>tempAt(rAt(k),DEPTH)-tempAt(tAt(k),DEPTH)},
+  sst:{t:()=>'Sea surface temperature, OSTIA',unit:'°C',cmap:cT,dom:[22,32],f:k=>F.sst[k]},
+  sss:{t:()=>'Sea surface salinity, SMAP/SMOS',unit:'psu',cmap:cSal,dom:[31,37],f:k=>F.sss[k]},
+  sla:{t:()=>'Sea level anomaly, DUACS',unit:'m',cmap:v=>cDiv(v/0.25),dom:[-0.25,0.25],f:k=>F.sla[k]},
+  cur:{t:()=>'Surface current speed, OSCAR',unit:'m/s',cmap:cSpd,dom:[0,1.8],
+    f:k=>Math.hypot(F.uc[k],F.vc[k]),vec:['uc','vc',26]},
+  wind:{t:()=>'Surface wind speed, CCMP',unit:'m/s',cmap:v=>cSpd(v/12.5),dom:[2,22],
+    f:k=>Math.hypot(F.uw[k],F.vw[k]),vec:['uw','vw',1.7]},
+  d20:{t:()=>'Depth of the 20 °C isotherm',unit:'m',cmap:cDep,dom:[40,190],f:k=>diagD20(rAt(k))},
+  mld:{t:()=>'Mixed layer depth',unit:'m',cmap:cDep,dom:[8,120],f:k=>F.rmld[k]}
+};
+
+/* ===== main map ===== */
+const mapC=document.getElementById('map'),mapX=mapC.getContext('2d');
+function drawMap(){
+  const L=LAYERS[LAYER],W=mapC.width,H=mapC.height;
+  paintGrid(k=>L.f(k),L.cmap);
+  blit(mapX,W,H);
+  if(L.vec) arrows(mapX,W,H,F[L.vec[0]],F[L.vec[1]],L.vec[2]);
+  coastline(mapX,W,H);graticule(mapX,W,H,mapC);
+  // pin
+  const x=px(LON0+(PIN.i+.5)*DX,W),y=py(LAT0+(PIN.j+.5)*DX,H);
+  mapX.save();
+  mapX.strokeStyle='#F0A83C';mapX.lineWidth=2;
+  mapX.beginPath();mapX.arc(x,y,9,0,TAU);mapX.stroke();
+  mapX.beginPath();mapX.moveTo(x-15,y);mapX.lineTo(x-11,y);mapX.moveTo(x+11,y);mapX.lineTo(x+15,y);
+  mapX.moveTo(x,y-15);mapX.lineTo(x,y-11);mapX.moveTo(x,y+11);mapX.lineTo(x,y+15);mapX.stroke();
+  // section line
+  mapX.strokeStyle='rgba(240,168,60,.45)';mapX.lineWidth=1.5;mapX.setLineDash([7,6]);
+  mapX.beginPath();
+  if(SECTION==='zonal'){mapX.moveTo(0,y);mapX.lineTo(W,y);}else{mapX.moveTo(x,0);mapX.lineTo(x,H);}
+  mapX.stroke();mapX.restore();
+  document.getElementById('mapLabel').textContent=L.t(DEPTH);
+  drawColorbar(L);
+}
+function drawColorbar(L){
+  const c=document.getElementById('cbar'),x=c.getContext('2d');
+  x.clearRect(0,0,c.width,c.height);
+  for(let i=0;i<c.width;i++){
+    const v=L.dom[0]+(L.dom[1]-L.dom[0])*i/(c.width-1);
+    x.fillStyle=rgb(L.cmap(v));x.fillRect(i,0,1,c.height);
+  }
+  document.getElementById('cbMin').textContent=L.dom[0];
+  document.getElementById('cbMax').textContent=L.dom[1];
+  document.getElementById('cbUnit').textContent=L.unit;
+}
+
+/* ===== section ===== */
+const secC=document.getElementById('sect'),secX=secC.getContext('2d');
+const ZMAX=1000;
+function zpix(z,H){return Math.sqrt(z/ZMAX)*H;}
+function drawSection(){
+  const W=secC.width,H=secC.height;
+  const zonal=SECTION==='zonal';
+  const N=zonal?NX:NY;
+  const cols=[];
+  for(let n=0;n<N;n++){
+    const k=zonal?PIN.j*NX+n:n*NX+PIN.i;
+    cols.push(LAND[k]?null:rAt(k));
+  }
+  const im=secX.createImageData(W,H);const d=im.data;
+  for(let xp=0;xp<W;xp++){
+    const n=Math.min(N-1,Math.floor(xp/W*N));const p=cols[n];
+    for(let yp=0;yp<H;yp++){
+      const q=(yp*W+xp)*4;
+      if(!p){d[q]=19;d[q+1]=44;d[q+2]=54;d[q+3]=255;continue;}
+      const z=Math.pow(yp/H,2)*ZMAX;
+      const c=cT(tempAt(p,z));
+      d[q]=c[0];d[q+1]=c[1];d[q+2]=c[2];d[q+3]=255;
+    }
+  }
+  secX.putImageData(im,0,0);
+  // isotherm + mld
+  function overlay(getZ,style,dash,lw){
+    secX.save();secX.strokeStyle=style;secX.lineWidth=lw;secX.setLineDash(dash);
+    secX.beginPath();let started=false;
+    for(let n=0;n<N;n++){
+      const p=cols[n];if(!p){started=false;continue;}
+      const x=(n+.5)/N*W,y=zpix(getZ(p),H);
+      if(!started){secX.moveTo(x,y);started=true;}else secX.lineTo(x,y);
+    }
+    secX.stroke();secX.restore();
+  }
+  const lu=Math.max(1,W/900);
+  overlay(p=>diagD20(p),'rgba(10,22,32,.92)',[],3.4*lu);
+  overlay(p=>diagD20(p),'#EAF6F8',[],1.7*lu);
+  overlay(p=>p.mld,'#F0A83C',[7*lu,6*lu],2.2*lu);
+  // axes
+  secX.save();
+  const sf=fpx(secC,11);
+  secX.strokeStyle='rgba(234,246,248,.22)';secX.fillStyle='rgba(222,237,241,.85)';
+  secX.font=sf+'px "IBM Plex Mono",monospace';secX.lineWidth=Math.max(1,W/900);
+  [0,50,100,200,400,700,1000].forEach(z=>{
+    const y=zpix(z,H);secX.beginPath();secX.moveTo(0,y);secX.lineTo(W,y);secX.stroke();
+    if(z>0)secX.fillText(z+' m',sf*0.5,y-sf*0.35);
+  });
+  const ticks=zonal?[50,60,70,80,90,100]:[8,12,16,20,24,28];
+  ticks.forEach(t=>{
+    const x=zonal?(t-LON0)/(LON1-LON0)*W:(t-LAT0)/(LAT1-LAT0)*W;
+    secX.beginPath();secX.moveTo(x,H-sf*1.4);secX.lineTo(x,H);secX.stroke();
+    secX.fillText(t+(zonal?'E':'N'),x+sf*0.3,H-sf*0.35);
+  });
+  // pin marker
+  const pinFrac=zonal?(PIN.i+.5)/NX:(PIN.j+.5)/NY;
+  secX.strokeStyle='#F0A83C';secX.lineWidth=2*lu;secX.setLineDash([5*lu,5*lu]);
+  secX.beginPath();secX.moveTo(pinFrac*W,0);secX.lineTo(pinFrac*W,H);secX.stroke();
+  secX.restore();
+  const lat=(LAT0+(PIN.j+.5)*DX).toFixed(2),lon=(LON0+(PIN.i+.5)*DX).toFixed(2);
+  document.getElementById('sectLabel').textContent=zonal?('Section along '+lat+'°N'):('Section along '+lon+'°E');
+  document.getElementById('sectionTitle').textContent=zonal?('Vertical section along '+lat+'°N'):('Vertical section along '+lon+'°E');
+}
+
+/* ===== latent space ===== */
+const latC=document.getElementById('latent'),latX=latC.getContext('2d');
+const LATSAMP=[];
+for(let n=0;n<2600;n++) LATSAMP.push(OCEAN[(n*977)%OCEAN.length]);
+function drawLatent(){
+  const W=latC.width,H=latC.height;
+  latX.clearRect(0,0,W,H);
+  latX.fillStyle='#061A26';latX.fillRect(0,0,W,H);
+  const pts=[];let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+  for(const k of LATSAMP){
+    const i=k%NX,j=(k/NX)|0;
+    const s=sAt(k);s.upw=F.upw[k];
+    const e=embed(LON0+(i+.5)*DX,LAT0+(j+.5)*DX,s);
+    let a=0,b=0;for(let m=0;m<EDIM;m++){a+=PA[m]*e[m];b+=PB[m]*e[m];}
+    if(a<x0)x0=a;if(a>x1)x1=a;if(b<y0)y0=b;if(b>y1)y1=b;
+    pts.push([a,b,regime(s),k]);
+  }
+  const pad=26;
+  for(const p of pts){
+    const x=pad+(p[0]-x0)/(x1-x0)*(W-2*pad);
+    const y=H-pad-(p[1]-y0)/(y1-y0)*(H-2*pad);
+    latX.fillStyle=REGIMES[p[2]].c;latX.globalAlpha=.42;
+    latX.fillRect(x-1.6,y-1.6,3.2,3.2);
+  }
+  latX.globalAlpha=1;
+  // highlight pinned
+  const pk=PIN.j*NX+PIN.i;
+  const ps=pts.find(p=>p[3]===pk)||(()=>{
+    const s=sAt(pk);const e=embed(LON0+(PIN.i+.5)*DX,LAT0+(PIN.j+.5)*DX,s);
+    let a=0,b=0;for(let m=0;m<EDIM;m++){a+=PA[m]*e[m];b+=PB[m]*e[m];}
+    return [a,b,regime(s),pk];
+  })();
+  const hx=clamp(pad+(ps[0]-x0)/(x1-x0)*(W-2*pad),8,W-8);
+  const hy=clamp(H-pad-(ps[1]-y0)/(y1-y0)*(H-2*pad),8,H-8);
+  latX.strokeStyle='#F0A83C';latX.lineWidth=2.4;latX.beginPath();latX.arc(hx,hy,9,0,TAU);latX.stroke();
+  const leg=document.getElementById('latLegend');
+  leg.innerHTML=REGIMES.map(r=>'<span><i style="background:'+r.c+'"></i>'+r.n+'</span>').join('');
+}
+
+/* ===== profile ===== */
+const proC=document.getElementById('profile'),proX=proC.getContext('2d');
+function drawProfile(){
+  const W=proC.width,H=proC.height,L=52,R=14,T=16,B=34;
+  const pw=W-L-R,ph=H-T-B;
+  proX.clearRect(0,0,W,H);proX.fillStyle='#061A26';proX.fillRect(0,0,W,H);
+  const k=PIN.j*NX+PIN.i;
+  if(LAND[k]){proX.fillStyle='#87A7B4';proX.font=fpx(proC,13)+'px Archivo,sans-serif';
+    proX.fillText('Pinned cell is on land.',L,H/2);return;}
+  const tp=tAt(k),rp=rAt(k);
+  const TMIN=3,TMAX=33;
+  const X=t=>L+(t-TMIN)/(TMAX-TMIN)*pw;
+  const Y=z=>T+Math.sqrt(z/ZMAX)*ph;
+  proX.save();
+  proX.strokeStyle='rgba(126,186,204,.16)';proX.fillStyle='rgba(135,167,180,.9)';
+  const pf=fpx(proC,11);proX.font=pf+'px "IBM Plex Mono",monospace';proX.lineWidth=1;
+  [0,50,100,200,400,700,1000].forEach(z=>{
+    const y=Y(z);proX.beginPath();proX.moveTo(L,y);proX.lineTo(W-R,y);proX.stroke();
+    proX.textAlign='right';proX.fillText(z,L-pf*0.35,y+pf*0.34);
+  });
+  proX.textAlign='center';
+  [5,10,15,20,25,30].forEach(t=>{
+    const x=X(t);proX.beginPath();proX.moveTo(x,T);proX.lineTo(x,H-B);proX.stroke();
+    proX.fillText(t,x,H-pf*0.75);
+  });
+  proX.fillStyle='rgba(135,167,180,.75)';
+  proX.fillText('temperature °C',L+pw/2,H-pf*0.06);
+  proX.restore();
+  // uncertainty band
+  const d20r0=diagD20(rp),therm=MODELS[MODEL].therm*MODELS[MODEL].k;
+  const sigma=z=>0.14+1.15*Math.exp(-Math.pow((z-d20r0)/78,2))*therm*(ACTIVE.sla?0.7:1.7)
+    +(z<40?(ACTIVE.sst?0.06:1.0):0);
+  proX.beginPath();
+  for(let z=0;z<=1000;z+=10){const t=tempAt(rp,z);const x=X(t+sigma(z)),y=Y(z);z===0?proX.moveTo(x,y):proX.lineTo(x,y);}
+  for(let z=1000;z>=0;z-=10){const t=tempAt(rp,z);proX.lineTo(X(t-sigma(z)),Y(z));}
+  proX.closePath();proX.fillStyle='rgba(72,214,192,.17)';proX.fill();
+  function line(p,col,lw){
+    proX.beginPath();
+    for(let z=0;z<=1000;z+=5){const x=X(tempAt(p,z)),y=Y(z);z===0?proX.moveTo(x,y):proX.lineTo(x,y);}
+    proX.strokeStyle=col;proX.lineWidth=lw;proX.stroke();
+  }
+  line(tp,'#F0A83C',3);
+  line(rp,'#48D6C0',3);
+  // standard level markers
+  proX.fillStyle='#48D6C0';
+  DEPTHS.forEach(z=>{const x=X(tempAt(rp,z)),y=Y(z);proX.beginPath();proX.arc(x,y,4.2,0,TAU);proX.fill();});
+  // selected depth guide
+  const yd=Y(DEPTH);
+  proX.strokeStyle='rgba(240,168,60,.55)';proX.lineWidth=1.5;proX.setLineDash([5,5]);
+  proX.beginPath();proX.moveTo(L,yd);proX.lineTo(W-R,yd);proX.stroke();proX.setLineDash([]);
+}
+
+/* ===== metrics ===== */
+const SAMP=[];for(let n=0;n<900;n++) SAMP.push(OCEAN[(n*613+17)%OCEAN.length]);
+function scoreLevels(A,mk){
+  const nL=DEPTHS.length;
+  const n=SAMP.length;
+  const se=new Float64Array(nL),bi=new Float64Array(nL);
+  const sx=new Float64Array(nL),sy=new Float64Array(nL),sxx=new Float64Array(nL),
+        syy=new Float64Array(nL),sxy=new Float64Array(nL);
+  for(const k of SAMP){
+    const i=k%NX,j=(k/NX)|0,lo=LON0+(i+.5)*DX,la=LAT0+(j+.5)*DX;
+    const s=sAt(k),tp=tAt(k);
+    const rp=(A===ACTIVE&&mk===MODEL)?rAt(k):reconParams(lo,la,DOY,s,tp,A,mk);
+    for(let m=0;m<nL;m++){
+      const a=tempAt(tp,DEPTHS[m]),b=tempAt(rp,DEPTHS[m]),e=b-a;
+      se[m]+=e*e;bi[m]+=e;sx[m]+=a;sy[m]+=b;sxx[m]+=a*a;syy[m]+=b*b;sxy[m]+=a*b;
+    }
+  }
+  return DEPTHS.map((z,m)=>{
+    const cov=sxy[m]/n-sx[m]*sy[m]/(n*n);
+    const vx=Math.max(1e-9,sxx[m]/n-Math.pow(sx[m]/n,2));
+    const vy=Math.max(1e-9,syy[m]/n-Math.pow(sy[m]/n,2));
+    return {z,rmse:Math.sqrt(se[m]/n),bias:bi[m]/n,r:clamp(cov/Math.sqrt(vx*vy),-1,1)};
+  });
+}
+function bandRMSE(rows,i0,i1){
+  let s=0,n=0;for(let m=i0;m<=i1;m++){s+=rows[m].rmse*rows[m].rmse;n++;}
+  return Math.sqrt(s/n);
+}
+function renderMetrics(){
+  const rows=scoreLevels(ACTIVE,MODEL);
+  const maxR=Math.max(...rows.map(r=>r.rmse),0.4);
+  document.getElementById('metricRows').innerHTML=rows.map(r=>
+    '<tr><td class="mono">'+r.z+' m</td><td class="mono">'+r.rmse.toFixed(2)+
+    '</td><td class="mono" style="color:'+(Math.abs(r.bias)>0.3?'var(--amber)':'var(--dim)')+'">'+
+    (r.bias>=0?'+':'')+r.bias.toFixed(2)+'</td><td class="mono">'+r.r.toFixed(3)+
+    '</td><td><span class="bar" style="width:'+(r.rmse/maxR*100).toFixed(1)+'%;background:'+
+    rgb(cErr(r.rmse))+'"></span></td></tr>').join('');
+  // ablation
+  const vars=[['sst','Sea surface temperature'],['sss','Sea surface salinity'],
+              ['sla','Sea level anomaly'],['cur','Surface currents'],['wind','Surface winds']];
+  const full=rows;
+  const fML=bandRMSE(full,0,4),fTH=bandRMSE(full,5,10),f03=bandRMSE(full,0,11);
+  let html='<tr><td>nothing removed</td><td class="mono">'+fML.toFixed(2)+'</td><td class="mono">'+
+    fTH.toFixed(2)+'</td><td class="mono">'+f03.toFixed(2)+'</td><td class="mono" style="color:var(--dim2)">baseline</td></tr>';
+  for(const [key,label] of vars){
+    if(!ACTIVE[key]){html+='<tr><td>'+label+'</td><td colspan="4" style="text-align:left;color:var(--dim2)">already off</td></tr>';continue;}
+    const A=Object.assign({},ACTIVE);A[key]=false;
+    const rr=scoreLevels(A,MODEL);
+    const ml=bandRMSE(rr,0,4),th=bandRMSE(rr,5,10),o3=bandRMSE(rr,0,11);
+    const d=o3-f03;
+    html+='<tr><td>'+label+'</td><td class="mono" style="color:'+(ml<fML?'var(--cyan)':'var(--ink)')+'">'+ml.toFixed(2)+
+      '</td><td class="mono" style="color:'+(th<fTH?'var(--cyan)':'var(--ink)')+'">'+th.toFixed(2)+
+      '</td><td class="mono">'+o3.toFixed(2)+'</td><td class="mono" style="color:'+
+      (d>0.02?'var(--rose)':d<-0.02?'var(--cyan)':'var(--dim2)')+'">'+(d>=0?'+':'')+d.toFixed(2)+'</td></tr>';
+  }
+  document.getElementById('ablationRows').innerHTML=html;
+}
+
+/* ===== scatter + error map ===== */
+const ARGO=[];for(let n=0;n<240;n++) ARGO.push(OCEAN[(n*1451+91)%OCEAN.length]);
+const scC=document.getElementById('scatter'),scX=scC.getContext('2d');
+function drawScatter(){
+  const W=scC.width,H=scC.height,qf=fpx(scC,11),P=qf*3.6;
+  scX.clearRect(0,0,W,H);scX.fillStyle='#061A26';scX.fillRect(0,0,W,H);
+  const pts=ARGO.map(k=>{
+    const tp=tAt(k),rp=rAt(k);
+    const obs=tempAt(tp,DEPTH)+0.09*fbm(k%NX,(k/NX)|0,301,2);
+    return [obs,tempAt(rp,DEPTH)];
+  });
+  let lo=1e9,hi=-1e9;pts.forEach(p=>{lo=Math.min(lo,p[0],p[1]);hi=Math.max(hi,p[0],p[1]);});
+  const pad=(hi-lo)*0.08+0.2;lo-=pad;hi+=pad;
+  const X=v=>P+(v-lo)/(hi-lo)*(W-P-14), Y=v=>H-P-(v-lo)/(hi-lo)*(H-P-14);
+  scX.strokeStyle='rgba(126,186,204,.18)';scX.lineWidth=1;
+  scX.fillStyle='rgba(135,167,180,.9)';scX.font=qf+'px "IBM Plex Mono",monospace';
+  const step=(hi-lo)>12?4:(hi-lo)>6?2:1;
+  for(let v=Math.ceil(lo/step)*step;v<hi;v+=step){
+    scX.beginPath();scX.moveTo(X(v),14);scX.lineTo(X(v),H-P);scX.stroke();
+    scX.beginPath();scX.moveTo(P,Y(v));scX.lineTo(W-14,Y(v));scX.stroke();
+    scX.textAlign='center';scX.fillText(v.toFixed(0),X(v),H-P+qf*1.35);
+    scX.textAlign='right';scX.fillText(v.toFixed(0),P-qf*0.4,Y(v)+qf*0.35);
+  }
+  scX.strokeStyle='rgba(240,168,60,.7)';scX.lineWidth=1.5;
+  scX.beginPath();scX.moveTo(X(lo),Y(lo));scX.lineTo(X(hi),Y(hi));scX.stroke();
+  pts.forEach(p=>{const e=Math.abs(p[1]-p[0]);
+    scX.fillStyle=rgb(cErr(e));scX.globalAlpha=.8;
+    scX.beginPath();scX.arc(X(p[0]),Y(p[1]),Math.max(3,qf*0.34),0,TAU);scX.fill();});
+  scX.globalAlpha=1;
+  let se=0,bi=0;pts.forEach(p=>{const e=p[1]-p[0];se+=e*e;bi+=e;});
+  const rmse=Math.sqrt(se/pts.length),bias=bi/pts.length;
+  scX.fillStyle='rgba(222,237,241,.95)';scX.font=(qf*1.05)+'px "IBM Plex Mono",monospace';scX.textAlign='left';
+  scX.fillText('n = '+pts.length+'   RMSE '+rmse.toFixed(2)+' °C   bias '+(bias>=0?'+':'')+bias.toFixed(2),P+4,qf*1.6);
+  scX.textAlign='center';scX.fillStyle='rgba(135,167,180,.85)';
+  scX.fillText('ARGO °C',W/2,H-qf*0.45);
+  scX.save();scX.translate(qf,H/2);scX.rotate(-Math.PI/2);scX.fillText('reconstructed °C',0,0);scX.restore();
+  document.getElementById('scatDepth').textContent=DEPTH+' m';
+}
+const emC=document.getElementById('errmap'),emX=emC.getContext('2d');
+function drawErrMap(){
+  const W=emC.width,H=emC.height;
+  paintGrid(k=>Math.abs(tempAt(rAt(k),DEPTH)-tempAt(tAt(k),DEPTH)),cErr);
+  blit(emX,W,H);coastline(emX,W,H);graticule(emX,W,H,emC);
+  document.getElementById('errLabel').textContent='Absolute error at '+DEPTH+' m · dark 0 °C to red 3 °C';
+}
+
+/* ===== right rail ===== */
+function fm(v,d){return (v>=0?'':'')+v.toFixed(d);}
+function renderRail(){
+  const k=PIN.j*NX+PIN.i;
+  const lon=LON0+(PIN.i+.5)*DX, lat=LAT0+(PIN.j+.5)*DX;
+  const pkv=document.getElementById('pointKV');
+  if(LAND[k]){
+    pkv.innerHTML='<dt>Position</dt><dd>'+lat.toFixed(2)+'N '+lon.toFixed(2)+'E</dd><dt>Status</dt><dd class="up">land cell</dd>';
+    document.getElementById('diagKV').innerHTML='';
+    document.getElementById('embStrip').innerHTML='';
+    document.getElementById('embKV').innerHTML='';
+    drawProfile();return;
+  }
+  const s=sAt(k),tp=tAt(k),rp=rAt(k);
+  pkv.innerHTML=
+    '<dt>Position</dt><dd>'+lat.toFixed(2)+'N '+lon.toFixed(2)+'E</dd>'+
+    '<dt>Sea surface temperature</dt><dd>'+s.sst.toFixed(2)+' °C</dd>'+
+    '<dt>Sea surface salinity</dt><dd>'+s.sss.toFixed(2)+' psu</dd>'+
+    '<dt>Sea level anomaly</dt><dd>'+(s.sla>=0?'+':'')+(s.sla*100).toFixed(1)+' cm</dd>'+
+    '<dt>Surface current</dt><dd>'+Math.hypot(s.uc,s.vc).toFixed(2)+' m/s</dd>'+
+    '<dt>Wind speed</dt><dd>'+s.wspd.toFixed(1)+' m/s</dd>'+
+    '<dt>T at '+DEPTH+' m</dt><dd class="good">'+tempAt(rp,DEPTH).toFixed(2)+' °C</dd>';
+  const d20r=diagD20(rp),d20t=diagD20(tp),ohc=diagOHC(rp),mg=maxGrad(rp);
+  const mhw=s.sst>29.6;
+  document.getElementById('diagKV').innerHTML=
+    '<dt>Mixed layer depth</dt><dd>'+rp.mld.toFixed(0)+' m <span style="color:var(--dim2)">('+tp.mld.toFixed(0)+')</span></dd>'+
+    '<dt>20 °C isotherm</dt><dd>'+d20r.toFixed(0)+' m <span style="color:var(--dim2)">('+d20t.toFixed(0)+')</span></dd>'+
+    '<dt>Strongest gradient</dt><dd>'+mg.g.toFixed(3)+' °C/m at '+mg.gz.toFixed(0)+' m</dd>'+
+    '<dt>Heat content 0–300 m</dt><dd>'+ohc.toFixed(2)+' GJ/m²</dd>'+
+    '<dt>T at 100 m</dt><dd>'+tempAt(rp,100).toFixed(2)+' °C</dd>'+
+    '<dt>Barrier-layer inversion</dt><dd class="'+(tp.inv>0.15?'up':'')+'">'+
+      (tp.inv>0.15?'+'+tp.inv.toFixed(2)+' °C':'none')+'</dd>';
+  document.getElementById('mhwNote').textContent = mhw
+    ? 'Surface exceeds the 29.6 °C marine-heatwave threshold used here; check whether the warm layer reaches below the mixed layer.'
+    : 'Grey numbers in brackets are the GLORYS values the reconstruction is aiming at.';
+  const e=embed(lon,lat,s);
+  document.getElementById('embStrip').innerHTML=Array.from(e).map(v=>{
+    const c=cDiv(v);return '<i style="background:'+rgb(c)+'" title="'+v.toFixed(3)+'"></i>';
+  }).join('');
+  let norm=0;for(const v of e)norm+=v*v;
+  document.getElementById('embKV').innerHTML=
+    '<dt>Water-mass regime</dt><dd style="color:'+REGIMES[regime(s)].c+'">'+REGIMES[regime(s)].n+'</dd>'+
+    '<dt>Latent norm</dt><dd>'+Math.sqrt(norm).toFixed(3)+'</dd>'+
+    '<dt>Dimensions</dt><dd>32</dd>';
+  drawProfile();
+}
+
+/* ===== UI ===== */
+const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MDAYS=[31,28,31,30,31,30,31,31,30,31,30,31];
+function doyLabel(d){
+  let m=0,r=d;while(r>MDAYS[m]){r-=MDAYS[m];m++;}
+  return r+' '+MONTHS[m];
+}
+function seasonOf(d){
+  if(d<=59||d>=336) return ['Northeast monsoon','#7FB6E8'];
+  if(d<=151) return ['Pre-monsoon warming','#F0A83C'];
+  if(d<=273) return ['Southwest monsoon','#48D6C0'];
+  return ['Post-monsoon','#A98FE0'];
+}
+(function seasonBar(){
+  const bar=document.getElementById('seasonBar');
+  const segs=[[59,'#7FB6E8'],[92,'#F0A83C'],[122,'#48D6C0'],[62,'#A98FE0'],[30,'#7FB6E8']];
+  bar.innerHTML=segs.map(s=>'<i style="flex:'+s[0]+';background:'+s[1]+';opacity:.55"></i>').join('');
+})();
+(function depthGrid(){
+  const g=document.getElementById('depthGrid');
+  g.innerHTML=DEPTHS.map(z=>'<button data-z="'+z+'" aria-pressed="'+(z===DEPTH)+'">'+z+'</button>').join('');
+  g.addEventListener('click',ev=>{
+    const b=ev.target.closest('button');if(!b)return;
+    DEPTH=+b.dataset.z;
+    [...g.children].forEach(c=>c.setAttribute('aria-pressed',String(+c.dataset.z===DEPTH)));
+    document.getElementById('depthChip').textContent=DEPTH+' m';
+    refresh(false);
+  });
+})();
+const INPUTS=[['sst','Sea surface temperature','OSTIA L4'],['sss','Sea surface salinity','SMAP / SMOS'],
+  ['sla','Sea level anomaly','DUACS'],['cur','Surface currents U, V','OSCAR'],['wind','Surface winds U, V','CCMP']];
+(function inputToggles(){
+  const w=document.getElementById('inputToggles');
+  w.innerHTML=INPUTS.map(v=>'<button class="toggle" data-k="'+v[0]+'" aria-pressed="true">'+
+    '<span class="sw"></span><span class="lab">'+v[1]+'<em>'+v[2]+'</em></span></button>').join('');
+  w.addEventListener('click',ev=>{
+    const b=ev.target.closest('.toggle');if(!b)return;
+    const k=b.dataset.k, on=ACTIVE[k];
+    if(on&&Object.values(ACTIVE).filter(Boolean).length<=1)return;
+    ACTIVE[k]=!on;b.setAttribute('aria-pressed',String(!on));
+    buildRecon();refresh(false);
+  });
+})();
+function seg(id,cb){
+  const el=document.getElementById(id);
+  el.addEventListener('click',ev=>{
+    const b=ev.target.closest('button');if(!b)return;
+    [...el.children].forEach(c=>c.setAttribute('aria-pressed',String(c===b)));
+    cb(b.dataset.v);
+  });
+}
+seg('layerSeg',v=>{LAYER=v;drawMap();});
+seg('modelSeg',v=>{MODEL=v;updateModelNote();buildRecon();refresh(false);});
+seg('sectionSeg',v=>{SECTION=v;drawSection();drawMap();});
+function updateModelNote(){
+  const M=MODELS[MODEL];
+  document.getElementById('modelNote').textContent=M.note+' '+M.params+' parameters, '+M.lat+' per daily field.';
+  document.getElementById('statusPill').textContent=M.name;
+}
+document.querySelector('.tabs').addEventListener('click',ev=>{
+  const b=ev.target.closest('button');if(!b)return;
+  document.querySelectorAll('.tabs button').forEach(t=>t.setAttribute('aria-selected',String(t===b)));
+  document.querySelectorAll('[data-panel]').forEach(p=>p.hidden=(p.dataset.panel!==b.dataset.tab));
+  if(b.dataset.tab==='validate'){renderMetrics();drawScatter();drawErrMap();}
+});
+const doySlider=document.getElementById('doy');
+doySlider.addEventListener('input',()=>{DOY=+doySlider.value;refresh(true);});
+let timer=null;
+document.getElementById('playBtn').addEventListener('click',function(){
+  if(timer){clearInterval(timer);timer=null;this.innerHTML='&#9654;';return;}
+  this.innerHTML='&#10073;&#10073;';
+  timer=setInterval(()=>{
+    DOY=(DOY+2)%365+1;doySlider.value=DOY;refresh(true);
+  },240);
+});
+function mapPick(ev,canvas){
+  const r=canvas.getBoundingClientRect();
+  const fx=(ev.clientX-r.left)/r.width, fy=(ev.clientY-r.top)/r.height;
+  const i=clamp(Math.floor(fx*NX),0,NX-1), j=clamp(NY-1-Math.floor(fy*NY),0,NY-1);
+  return {i,j,lon:LON0+(i+.5)*DX,lat:LAT0+(j+.5)*DX};
+}
+const hover=document.getElementById('hoverBox');
+mapC.addEventListener('mousemove',ev=>{
+  const p=mapPick(ev,mapC),k=p.j*NX+p.i;
+  const r=mapC.getBoundingClientRect();
+  hover.style.left=(ev.clientX-r.left+14)+'px';
+  hover.style.top=(ev.clientY-r.top+12)+'px';
+  if(LAND[k]){hover.style.opacity=0;return;}
+  const L=LAYERS[LAYER];const v=L.f(k);
+  hover.style.opacity=1;
+  hover.innerHTML=p.lat.toFixed(2)+'N '+p.lon.toFixed(2)+'E<br>'+
+    (typeof v==='number'?v.toFixed(2)+' '+L.unit:'');
+});
+mapC.addEventListener('mouseleave',()=>hover.style.opacity=0);
+function pinFrom(ev,canvas){
+  const p=mapPick(ev,canvas);PIN={i:p.i,j:p.j};
+  drawMap();drawSection();renderRail();drawLatent();
+}
+mapC.addEventListener('click',ev=>pinFrom(ev,mapC));
+emC.addEventListener('click',ev=>pinFrom(ev,emC));
+
+/* export */
+document.getElementById('exportBtn').addEventListener('click',()=>{
+  const k=PIN.j*NX+PIN.i;
+  if(LAND[k])return;
+  const lon=(LON0+(PIN.i+.5)*DX).toFixed(3),lat=(LAT0+(PIN.j+.5)*DX).toFixed(3);
+  const tp=tAt(k),rp=rAt(k),s=sAt(k);
+  let t='# OceanEmbed profile export\n'+
+    '# lon,'+lon+'\n# lat,'+lat+'\n# day_of_year,'+DOY+'\n'+
+    '# encoder,'+MODELS[MODEL].name+'\n'+
+    '# inputs,'+Object.keys(ACTIVE).filter(x=>ACTIVE[x]).join(' ')+'\n'+
+    '# sst,'+s.sst.toFixed(3)+'\n# sss,'+s.sss.toFixed(3)+'\n# sla_m,'+s.sla.toFixed(4)+'\n'+
+    'depth_m,t_reconstructed_c,t_glorys_c,error_c\n';
+  DEPTHS.forEach(z=>{
+    const a=tempAt(rp,z),b=tempAt(tp,z);
+    t+=z+','+a.toFixed(3)+','+b.toFixed(3)+','+(a-b).toFixed(3)+'\n';
+  });
+  document.getElementById('csv').value=t;
+  document.getElementById('modal').dataset.open='true';
+});
+document.getElementById('closeBtn').addEventListener('click',()=>
+  document.getElementById('modal').dataset.open='false');
+document.getElementById('modal').addEventListener('click',ev=>{
+  if(ev.target.id==='modal') ev.currentTarget.dataset.open='false';});
+document.getElementById('copyBtn').addEventListener('click',function(){
+  const ta=document.getElementById('csv');ta.select();
+  const done=()=>{this.textContent='Copied';setTimeout(()=>this.textContent='Copy',1400);};
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(ta.value).then(done,()=>{try{document.execCommand('copy');done();}catch(e){}});
+  }else{try{document.execCommand('copy');done();}catch(e){}}
+});
+
+/* ===== refresh ===== */
+function refresh(rebuild){
+  if(rebuild){buildSurface();buildRecon();}
+  document.getElementById('doyChip').textContent='day '+DOY;
+  document.getElementById('dateLabel').textContent=doyLabel(DOY);
+  const s=seasonOf(DOY);
+  const sl=document.getElementById('seasonLabel');
+  sl.textContent=s[0];sl.style.color=s[1];
+  drawMap();drawSection();renderRail();drawLatent();
+  const vt=document.querySelector('[data-panel="validate"]');
+  if(vt&&!vt.hidden){renderMetrics();drawScatter();drawErrMap();}
+}
+let rz=null;
+addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>refresh(false),160);});
+updateModelNote();
+buildSurface();buildRecon();
+refresh(false);
+</script>
+</body>
+</html>
