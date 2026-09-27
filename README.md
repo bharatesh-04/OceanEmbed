@@ -10,6 +10,12 @@ npm start
 
 Open http://localhost:3000. Set `PORT` to use another port.
 
+## Deploy to Render
+
+This repository includes `render.yaml` for a Render **Web Service**. In Render, choose **New + → Blueprint**, connect this repository, and deploy the `main` branch. The blueprint starts the Node server, which serves both the website at `/` and the API. Do not create a Static Site for this configuration.
+
+To configure a Web Service manually, use build command `npm install`, start command `npm start`, leave the root directory blank, and set the health-check path to `/api/status`. No environment variables are required; Render supplies `PORT`.
+
 ## API
 
 - `GET /api/status` reports service availability and explicitly indicates that data are synthetic and no model is loaded.
